@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(__file__) + os.sep + '../')
 from Geo.geo import *
 from Utils.utils import *
 
+
 class AdjMatrix:
     """ Ajacency matrix object
 
@@ -17,7 +18,7 @@ class AdjMatrix:
     Parameters
     ----------
     matrix : np.array
-        initialized adjacent matrix
+        initialized adjacent matrix or shaped matrix with zero
 
     region_seg_model : string
         name of region segmentation method, default 'polygon', can be 'grid'
@@ -29,33 +30,44 @@ class AdjMatrix:
         only for 'grid', regions' colunm amounts 
 
     polygons : list
-        list of region polygons, usually the first dimention claims the a whole region,\\
-        the second dimention refers the partition of region, last dimention stores the\\ 
-        latitude and longitude of every vertical, like \\
+        list of region polygons, usually the first dimention claims the a whole region,
+        the second dimention refers the partition of region, last dimention stores the
+        latitude and longitude of every vertical, like 
         [   region 1 : 
-                [   partition 1 : [[lon, lat], [lon, lat]], \\
-                    partition 2 : [[lon, lat], [lon, lat]], ... \\
-                ], ...\\
+                [   partition 1 : [[lon, lat], [lon, lat]], 
+                    partition 2 : [[lon, lat], [lon, lat]], ... 
+                ], ...
         ]
     """
 
     def flatten_poygons(self, polygons):
+        """ a region may contains several polygons, flatten polygons to one whole vertical
+        set, each region corresponding to its vertical set. 
+        
+        Parameters
+        ----------
+            polygons : numpy.array
+                see parameter description of 'AdjMatrix'
+        """
         for i in range(len(polygons)):
             l1 = polygons[i]
             la = [] # all verticals of polygon
-            for l in l1:
-                if len(la) == 0:
-                    la = l.copy()
-                else:
-                    la.extend(l)
+            if not isinstance(l1[0][0], float):
+                for l in l1:
+                    if len(la) == 0:
+                        la = l.copy()
+                    else:
+                        la.extend(l)
+            else:
+                la = l1
             self.poygons_flatten.append(la)
         return self.poygons_flatten
 
-    def cal_eucl_dist(self, center, indexs, l):
+    def cal_eucl_dist(self, center_index, indexs, centers):
         dists = []
         for index in indexs:
-            dists.append(np.sqrt(sum(np.power(center - l[index], 2))))
-        return dists
+            dists.append(np.sqrt(sum(np.power(centers[center_index] - centers[index], 2))))
+        return np.array(dists)
 
     def cal_guass_weight(self, center, indexs, l, k = 0, theta = 0):
         weights = []
@@ -66,7 +78,7 @@ class AdjMatrix:
                 weights.append(w)
             else:
                 weights.append(0)
-        return weights
+        return np.array(weights)
 
     def get_mainland(self):
         l = []
@@ -93,9 +105,9 @@ class AdjMatrix:
         hash_l = []
         self.flatten_poygons(polygons)
 
-        for i in range(len(self.flatten_poygons)):
+        for i in range(len(self.poygons_flatten)):
             # change latitude and longitude to string with high data precision
-            hash_l.append(np.array([struct.pack('<f', x[0]) + struct.pack('>f', x[1]) for x in self.flatten_poygons[i]]))
+            hash_l.append(np.array([struct.pack('<f', x[0]) + struct.pack('>f', x[1]) for x in self.poygons_flatten[i]]))
 
         adj_matrix = np.array([[0]*len(polygons)]*len(polygons))
         for i in range(len(hash_l)):
@@ -149,7 +161,7 @@ class AdjMatrix:
                     polygon_i = Polygon(l[i])
                     polygon_j = Polygon(l[j])  
                     share_lens.append(polygon_i.intersection(polygon_j).length)
-                self.adjmatrix[i, adj_index] = norm_by_col(share_lens)
+                self.adjmatrix[i, adj_index] = norm_by_col(np.array(share_lens))
         else:   
             l = self.polygons
             for i in range(len(l)):
@@ -163,12 +175,13 @@ class AdjMatrix:
                             polygon_j = Polygon(l[j][n])
                             length += polygon_i.intersection(polygon_j).length
                     share_lens.append(length)
-                self.adjmatrix[i, adj_index] = norm_by_col(share_lens)
+                
+                self.adjmatrix[i, adj_index] = norm_by_col(np.array(share_lens))
                 
         return None
 
     def __init__(self, matrix, region_seg_model, grid_h = None, grid_w = None, polygons = None):
-        self.region_seg_model = self.region_seg_model
+        self.region_seg_model = region_seg_model
         self.grid_h = grid_h
         self.grid_w = grid_w
         self.polygons = polygons
@@ -177,11 +190,11 @@ class AdjMatrix:
         if np.sum(matrix) == 0:
             print('matrix is not initialized, try to generate one ......')
             if region_seg_model == 'grid':
-                self.adjmatrix = self.gen_grid_adjmatrix(grid_h, grid_w)
+                self.adjmatrix = self.gen_grid_adjmatrix(grid_h, grid_w).astype(float)
             else:
-                self.adjmatrix = self.gen_polygon_adjmatrix(polygons)
+                self.adjmatrix = self.gen_polygon_adjmatrix(polygons).astype(float)
         else:
-            self.adjmatrix = matrix
+            self.adjmatrix = matrix.astype(float)
 
     def weight_edge(self, by = None, mainland = True, k = 0, theta = 0):
         if self.region_seg_model == 'grid':
@@ -192,3 +205,4 @@ class AdjMatrix:
             self.weight_center_dist(mainland, k, theta)
         else:
             self.weight_share_length(mainland)
+

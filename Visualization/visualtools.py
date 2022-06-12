@@ -1,12 +1,13 @@
 import math
 from sklearn.manifold import TSNE
+from sklearn.decomposition import PCA
 import numpy as np
 import matplotlib.pyplot as plt
+
 import sys, os
 sys.path.append(os.path.dirname(__file__) + os.sep + '../')
 from Utils.utils import rgb2hex
-from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA
+
 
 def show_mass(data, labels, u_labels=None, colors=[], reduction = 'tsne'):
     fig = plt.figure(figsize=(15, 10))
@@ -65,7 +66,7 @@ def show_series(data, labels, u_labels=None, colors=[]):
             if i*n_col + j >= len(u_labels):
                 continue
             ax = fig.add_subplot(n_row, n_col, i*n_col + j + 1)
-            label = u_labels[i]
+            label = u_labels[i*n_col + j]
             data_cor_label = data[np.where(labels == label)[0]]
             for k in range(len(data_cor_label)):
                 ax.plot(range(data.shape[1]), data_cor_label[k], c='#f3f3f3')
@@ -92,4 +93,5 @@ def visiualize_cluster(data, labels, method):
         fig = show_mass(data, labels, u_labels, colors)
     elif method == 'series':
         fig = show_series(data, labels, u_labels, colors)
+
     return fig
